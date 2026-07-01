@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Academic Advising Portal | Degree Planner</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body class="portal-body">
+  <div class="portal-shell">
+    <aside class="portal-sidebar">
+      <div>
+        <p class="eyebrow">University Advising Portal</p>
+        <h1 class="sidebar-title">Academic Planning</h1>
+        <p class="sidebar-copy">
+          Degree structure and semester planning for the selected program and major.
+        </p>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Dashboard sections">
+        <a href="#dashboard">Dashboard</a>
+        <a href="#course-progress">Course Progress</a>
+        <a href="#study-planner">Study Planner</a>
+        <a href="#requirements">Requirement Breakdown</a>
+      </nav>
+
+      <section class="sidebar-card">
+        <p class="meta-label">Student</p>
+        <p class="meta-value" id="studentName">Loading profile</p>
+        <p class="meta-subtle" id="studentNumber">Please wait</p>
+      </section>
+
+      <section class="sidebar-card">
+        <p class="meta-label">Program</p>
+        <p class="meta-value" id="sidebarProgram">-</p>
+        <p class="meta-subtle" id="sidebarMajor">-</p>
+      </section>
+
+      <button class="button button-secondary button-full" id="logoutBtn" type="button">Sign Out</button>
+    </aside>
+
+    <main class="portal-content">
+      <section class="portal-masthead" aria-label="Portal overview">
+        <div class="portal-masthead-copy">
+          <p class="eyebrow">Program Planning</p>
+          <h2 class="portal-masthead-title">Student Program Planner</h2>
+          <p class="portal-masthead-text">
+            A handbook-aligned planning workspace for reviewing degree requirements, recording completed courses, and preparing semester study sequences.
+          </p>
+        </div>
+        <div class="portal-masthead-meta" aria-label="Planner features">
+          <span>Requirement audit</span>
+          <span>Semester sequencing</span>
+          <span>Saved versions</span>
+        </div>
+      </section>
+
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Degree Planner and Advising Dashboard</p>
+          <h2 class="page-title" id="pageTitle">Academic Planning</h2>
+          <p class="page-subtitle">
+            Tick completed courses and elective slots, then generate a recommended study plan by semester.
+          </p>
+        </div>
+        <div id="statusMessage" class="message"></div>
+      </header>
+
+      <section class="overview-band" aria-label="Planning workflow">
+        <article class="overview-band-item">
+          <span class="overview-band-step">1</span>
+          <div>
+            <h3 class="overview-band-title">Record Completed Courses</h3>
+            <p class="overview-band-copy">Tick only the courses and elective slots already passed by the student.</p>
+          </div>
+        </article>
+        <article class="overview-band-item">
+          <span class="overview-band-step">2</span>
+          <div>
+            <h3 class="overview-band-title">Review Remaining Requirements</h3>
+            <p class="overview-band-copy">Use the dashboard and requirement tables to confirm core, major, electives, and level rules.</p>
+          </div>
+        </article>
+        <article class="overview-band-item">
+          <span class="overview-band-step">3</span>
+          <div>
+            <h3 class="overview-band-title">Generate and Adjust the Plan</h3>
+            <p class="overview-band-copy">Build a semester sequence, drag courses where needed, and keep up to four saved versions.</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" id="dashboard">
+        <div class="panel-header">
+          <div>
+            <h3 class="section-title">Dashboard</h3>
+            <p class="section-copy">Program and major selections are shown for the current student profile.</p>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric">
+            <span class="metric-label">Completed Units</span>
+            <strong class="metric-value" id="earnedUnitsMetric">0</strong>
+          </article>
+          <article class="metric">
+            <span class="metric-label">Remaining Units</span>
+            <strong class="metric-value" id="remainingUnitsMetric">0</strong>
+          </article>
+          <article class="metric">
+            <span class="metric-label">Core Progress</span>
+            <strong class="metric-value" id="coreProgressMetric">0 / 0</strong>
+          </article>
+          <article class="metric">
+            <span class="metric-label">Major Progress</span>
+            <strong class="metric-value" id="majorProgressMetric">0 / 0</strong>
+          </article>
+        </div>
+
+        <div class="split-grid">
+          <section>
+            <h4 class="subsection-title">Program Requirements</h4>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Requirement</th>
+                    <th>Completed</th>
+                    <th>Remaining</th>
+                  </tr>
+                </thead>
+                <tbody id="programSummaryBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section>
+            <h4 class="subsection-title">Major Requirements</h4>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Requirement</th>
+                    <th>Completed</th>
+                    <th>Remaining</th>
+                  </tr>
+                </thead>
+                <tbody id="majorSummaryBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel" id="course-progress">
+        <div class="panel-header">
+          <div>
+            <h3 class="section-title">Course Progress</h3>
+            <p class="section-copy">
+              Tick the required courses and elective slots the student has already completed. The planner will treat only those ticked items as completed.
+            </p>
+          </div>
+          <label class="field field-inline">
+            <span class="field-label">Search Courses</span>
+            <input class="field-control" id="courseSearch" placeholder="Filter by code or course name" />
+          </label>
+        </div>
+
+        <div class="table-wrap">
+            <table class="data-table" id="courseRecordsTable">
+              <thead>
+                <tr>
+                  <th>Course</th>
+                  <th>Requirement Blocks</th>
+                  <th>Completed</th>
+                </tr>
+              </thead>
+              <tbody id="courseRecordsBody"></tbody>
+            </table>
+          </div>
+
+      </section>
+
+      <section class="panel" id="study-planner">
+        <div class="panel-header">
+          <div>
+            <h3 class="section-title">Study Plan Recommendations</h3>
+            <p class="section-copy">
+              Tick completed courses above, choose the term, study load, and year you want to start from, then generate the study plan. After that, you can drag courses between semesters and save the adjusted plan.
+            </p>
+          </div>
+        </div>
+
+        <div class="form-grid planner-controls">
+          <label class="field">
+            <span class="field-label">Start Term</span>
+            <select class="field-control" id="startTerm">
+              <option value="S1">Semester 1</option>
+              <option value="S2">Semester 2</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">Study Load</span>
+            <select class="field-control" id="studyLoad">
+              <option value="4">Full-time (4 courses)</option>
+              <option value="3">Three-course load (3 courses)</option>
+              <option value="2">Part-time (2 courses)</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">Start Year</span>
+            <input class="field-control" id="startYear" type="number" min="2024" max="2035" value="2026" />
+          </label>
+        </div>
+
+        <div class="button-row">
+          <button class="button" id="generatePlanBtn" type="button">Generate Study Plan</button>
+          <button class="button button-secondary" id="savePlanBtn" type="button" disabled>Save Plan</button>
+          <button class="button button-secondary" id="downloadPdfBtn" type="button" disabled>Download PDF</button>
+        </div>
+
+        <div id="planValidationBox" class="message plan-validation-note" aria-live="polite"></div>
+
+        <div id="studyPlanOutput" class="plan-stack empty-state">
+          Generate a study plan to view semester-by-semester recommendations.
+        </div>
+
+        <div id="savedPlanOutput" class="plan-stack"></div>
+      </section>
+
+      <section class="panel" id="requirements">
+        <div class="panel-header">
+          <div>
+            <h3 class="section-title">Requirement Breakdown</h3>
+            <p class="section-copy">Completion status is shown for core, major, electives, and level distribution rules.</p>
+          </div>
+        </div>
+
+        <div class="split-grid">
+          <section>
+            <h4 class="subsection-title">Program Core</h4>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Block</th>
+                    <th>Completed Units</th>
+                    <th>Remaining Units</th>
+                  </tr>
+                </thead>
+                <tbody id="programBreakdownBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section>
+            <h4 class="subsection-title">Major Requirements</h4>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Block</th>
+                    <th>Completed Units</th>
+                    <th>Remaining Units</th>
+                  </tr>
+                </thead>
+                <tbody id="majorBreakdownBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <section class="subsection">
+          <h4 class="subsection-title">Level Distribution</h4>
+          <div class="split-grid">
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Level</th>
+                    <th>Completed Units</th>
+                  </tr>
+                </thead>
+                <tbody id="levelDistributionBody"></tbody>
+              </table>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Rule</th>
+                    <th>Status</th>
+                    <th>Progress</th>
+                  </tr>
+                </thead>
+                <tbody id="levelRulesBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="planPreventModal" class="modal-dialog" aria-labelledby="planPreventModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="planPreventModalTitle">Course Move Not Allowed</h3>
+      </div>
+      <div class="modal-body" id="planPreventModalBody"></div>
+      <div class="modal-actions">
+        <button class="button button-secondary" id="planPreventModalCloseBtn" type="button">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>
+

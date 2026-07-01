@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Academic Advising Portal | Sign In</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body class="login-body">
+  <main class="login-shell">
+    <section class="login-panel login-panel-brand">
+      <p class="eyebrow">University Advising Portal</p>
+      <h1 class="login-title">Academic Planning and Advising</h1>
+      <p class="login-copy">
+        Sign in with a seeded student ID to review program requirements, manage course records,
+        and generate semester study recommendations.
+      </p>
+
+      <div class="login-feature-list" aria-label="Portal functions">
+        <div class="login-feature-item">
+          <strong>Requirement Audit</strong>
+          <span>Review core, major, electives, and level distribution rules.</span>
+        </div>
+        <div class="login-feature-item">
+          <strong>Study Planning</strong>
+          <span>Generate a semester sequence and refine it before saving.</span>
+        </div>
+        <div class="login-feature-item">
+          <strong>Version History</strong>
+          <span>Keep multiple saved study plans for comparison and export.</span>
+        </div>
+      </div>
+
+      <div class="definition-list">
+        <div class="definition-item">
+          <span class="definition-term">Program</span>
+          <span class="definition-value">Bachelor of Information Technology</span>
+        </div>
+        <div class="definition-item">
+          <span class="definition-term">Major</span>
+          <span class="definition-value">ICT Business Analytics</span>
+        </div>
+        <div class="definition-item">
+          <span class="definition-term">Demo IDs</span>
+          <span class="definition-value"><code>c3415519</code>, <code>c0000001</code>, <code>c0000002</code></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="login-panel">
+      <h2 class="section-title">Student Sign In</h2>
+      <p class="section-copy">
+        This prototype authenticates against seeded student profiles stored in the advising database.
+      </p>
+
+      <form id="loginForm" class="form-stack">
+        <label class="field">
+          <span class="field-label">Student ID</span>
+          <input
+            class="field-control"
+            id="studentId"
+            name="studentId"
+            placeholder="Enter student ID"
+            autocomplete="off"
+            required
+          />
+        </label>
+
+        <div class="button-row">
+          <button class="button" type="submit">Open Advising Dashboard</button>
+          <button class="button button-secondary" type="button" id="clearSessionBtn">Clear Session</button>
+        </div>
+
+        <div id="loginMessage" class="message" aria-live="polite"></div>
+      </form>
+    </section>
+  </main>
+
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

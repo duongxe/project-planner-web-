@@ -1,31 +1,47 @@
 # AI Planner (UON Tool)
 
-Ứng dụng web hỗ trợ sinh viên lập kế hoạch học tập và theo dõi tiến độ tốt nghiệp. Toàn bộ mã nguồn nằm trong thư mục [unlu-tool/](unlu-tool/).
+A web application that helps students plan their coursework and track degree progress. All source code lives in [unlu-tool/](unlu-tool/).
 
-## Đây là gì
+## What it is
 
-Một cổng tư vấn học vụ (academic advising / degree planning) gồm frontend HTML/CSS/JS thuần và backend Node.js + SQLite. Sinh viên đăng nhập bằng mã số sinh viên, xem tiến độ hoàn thành chương trình học (khối kiến thức đại cương/chuyên ngành/tự chọn, quy định theo cấp độ môn học), khai báo môn đã học/đang học, tự động sinh kế hoạch học theo từng học kỳ, lưu nhiều phiên bản kế hoạch, và điều chỉnh kế hoạch thông qua một trợ lý chat bằng ngôn ngữ tự nhiên.
+An academic advising / degree-planning portal made of a plain HTML/CSS/JS frontend and a Node.js + SQLite backend. Students log in with their student ID, review their progress toward graduation (core, major, and elective requirement blocks, plus course-level rules), record completed/in-progress courses, auto-generate a semester-by-semester study plan, save multiple plan versions, and adjust plans through a natural-language chat assistant.
 
-## Đã làm những gì
+## What has been built
 
 **Frontend** (`unlu-tool/`)
-- `login.html` + `js/login.js`: đăng nhập bằng mã số sinh viên, lưu phiên trong `localStorage`.
-- `planner.html` + `js/dashboard.js`: trang chính gồm thông tin sinh viên/chương trình/chuyên ngành, các chỉ số tiến độ (số tín chỉ đã đạt/còn lại), bảng môn học đã ghi nhận, công cụ tạo/lưu/xuất PDF kế hoạch học, khung chat trợ lý, và lịch sử các phiên bản kế hoạch đã lưu.
-- `js/api.js`: lớp gọi API tới backend (`http://localhost:3001/api`).
+- `login.html` + `js/login.js`: student-ID login form, session stored in `localStorage`.
+- `planner.html` + `js/dashboard.js`: main dashboard with student/program/major info, progress metrics (earned/remaining units), a course-records table, study-plan controls (generate/save/export to PDF), a planner chat panel, and saved-plan version history.
+- `js/api.js`: API client that talks to the backend (`http://localhost:3001/api`).
 
 **Backend** (`unlu-tool/backend/`)
-- Kiến trúc phân lớp: repositories → services → routes, dùng Express và SQLite (`better-sqlite3`).
-- **Routes**: đăng nhập, chương trình học/chuyên ngành, thông tin môn học, tiến độ sinh viên, danh sách môn đủ điều kiện đăng ký, kế hoạch học (tạo/lưu/xoá/validate), chọn môn cho các "option slot" chuyên ngành, ghi nhận điểm/môn học, và chat trợ lý kế hoạch.
-- **Services chính**:
-  - `ruleEngineService` — engine đánh giá điều kiện tiên quyết/loại trừ/kiến thức giả định của môn học.
-  - `progressService` — tính tiến độ hoàn thành chương trình (tín chỉ, các khối yêu cầu, phân bố theo cấp độ).
-  - `studyPlanService` — sinh, xác thực, lưu và quản lý phiên bản kế hoạch học theo học kỳ.
-  - `majorOptionService` — quản lý lựa chọn môn học cho các option slot của chuyên ngành.
-  - `catalogService` — tổng hợp dữ liệu chương trình/chuyên ngành/môn học.
-  - `ollamaProvider` + `plannerChatService` — dùng Ollama (model `gemma3`) để phân tích yêu cầu bằng ngôn ngữ tự nhiên (VD: giảm tải học kỳ, dời môn, hỏi giả định "what-if") thành các thay đổi cụ thể lên kế hoạch học.
-- **Database**: SQLite với schema gồm chương trình học, chuyên ngành, môn học, các khối yêu cầu (kèm bảng nối), quy định theo cấp độ môn học, luật tiên quyết/loại trừ, hồ sơ sinh viên, lịch sử môn học của sinh viên, lựa chọn option slot, và các phiên bản kế hoạch học đã lưu. Có sẵn seed dữ liệu mẫu cho ngành Cử nhân CNTT và Cử nhân Khoa học Máy tính (AI).
+- Layered architecture (repositories → services → routes) built on Express and SQLite (`better-sqlite3`).
+- **Routes**: login, programs/majors, course lookup, student progress, eligible-course listing, study-plan generation/save/delete/validation, major "option slot" selection, course-record management, and planner chat.
+- **Key services**:
+  - `ruleEngineService` — evaluates prerequisite/exclusion/assumed-knowledge rules for courses.
+  - `progressService` — computes degree progress (units earned, requirement-block completion, level distribution).
+  - `studyPlanService` — generates, validates, saves, and manages versions of semester-by-semester study plans.
+  - `majorOptionService` — manages a student's choice of course for major "option slots".
+  - `catalogService` — aggregates program/major/course catalog data.
+  - `ollamaProvider` + `plannerChatService` — use a local Ollama instance (model `gemma3`) to parse natural-language requests (e.g. reduce a term's course load, move a course, "what-if" adjustments) into concrete study-plan changes.
+- **Database**: SQLite schema covering programs, majors, courses, requirement blocks (with join tables), course-level rules, prerequisite/exclusion rules, student profiles, student course history, major option-slot selections, and saved study-plan versions. Seed data is included for a Bachelor of IT program and a Bachelor of Computer Science (AI) program.
 
-## Chạy thử
+## AI Planner Chat Assistant
+
+The dashboard includes a chat panel where a student can type a plain-language request instead of manually editing the study plan. For example:
+
+- "Reduce my course load next term"
+- "Move [course] to a later semester"
+- "What if I take an extra elective this term?"
+
+Under the hood:
+
+1. The message is sent to `ollamaProvider.parsePlannerMessage`, which calls a **local Ollama instance** (`http://localhost:11434/api/chat`, model `gemma3`) with a strict system prompt and JSON schema. Ollama's only job is to turn free text into a structured intent — one of `reduce_term_load`, `move_course_request`, `what_if_adjustment`, or `unknown` — it never generates the plan itself.
+2. `plannerChatService.applyPlannerIntent` takes that structured intent and dispatches it to the matching handler (`reduceTermLoad`, `moveCourseRequest`, or `whatIfAdjustment`).
+3. That handler calls into `studyPlanService` to actually recompute and validate the affected part of the study plan (respecting prerequisites, unit limits, and requirement rules via `ruleEngineService`), then returns the updated plan to the frontend.
+
+Because parsing and plan mutation are separate steps, the AI model never decides academic rules directly — it only translates intent, while all planning logic stays deterministic and rule-based. This also means the chat feature requires Ollama running locally with the `gemma3` model pulled; without it, the rest of the app (progress tracking, manual plan editing, etc.) still works normally.
+
+## Running it
 
 ```bash
 cd unlu-tool/backend
@@ -33,6 +49,6 @@ npm install
 npm start
 ```
 
-Server chạy ở cổng `3001` (có thể đổi qua biến môi trường `PORT`) và cũng phục vụ luôn phần frontend tĩnh, nên chỉ cần mở `http://localhost:3001/login.html`.
+The server listens on port `3001` (override with the `PORT` env variable) and also serves the static frontend, so you can just open `http://localhost:3001/login.html`.
 
-Tính năng chat trợ lý kế hoạch cần có [Ollama](https://ollama.com) chạy local với model `gemma3` ở cổng `11434`.
+The planner chat feature additionally requires a local [Ollama](https://ollama.com) instance running the `gemma3` model on port `11434`.

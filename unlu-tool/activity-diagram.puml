@@ -1,0 +1,361 @@
+@startuml
+title Activity Diagram - Academic Advising Planner
+
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor #F7F9FB
+  BorderColor #2F4A5F
+  FontColor #172433
+}
+skinparam partition {
+  BackgroundColor #FFFFFF
+  BorderColor #AAB7C4
+}
+
+start
+
+|Backend server|
+:Start backend/server.js;
+:Open SQLite database\nbackend/data/academic_advising.db;
+:Enable foreign_keys pragma;
+:Run migrations from backend/db/migrations\nand seeds from backend/db/seeds;
+:Create repositories;
+:Create services\nCatalog, RuleEngine, Progress,\nStudyPlan, MajorOption;
+:Register Express middleware\nCORS, JSON, static files;
+:Register API routes\nlogin, programs, majors, courses,\nstudents, planner chat;
+:Listen on PORT or 3001;
+
+|User|
+:Open index.html / login.html;
+
+|Frontend - login.js|
+if (localStorage has uontool_session?) then (yes)
+  :Redirect to planner.html;
+else (no)
+  :Show login form;
+endif
+
+|User|
+:Enter student ID and submit;
+
+|Frontend - api.js|
+:POST /api/login\n{ studentId };
+
+|Backend API - authRoutes|
+:Trim and validate studentId;
+if (studentId is empty?) then (yes)
+  :Throw AppError 400;
+  |Backend middleware|
+  :Return JSON { ok:false, error };
+  stop
+else (no)
+  :StudentRepository.getStudentByStudentNumber();
+endif
+
+if (student exists?) then (no)
+  :Throw AppError 404;
+  |Backend middleware|
+  :Return JSON { ok:false, error };
+  stop
+else (yes)
+  :Return student profile\nid, studentNumber, name,\nprogram, major;
+endif
+
+|Frontend - login.js|
+:Save response.data to localStorage;
+:Redirect to planner.html;
+
+|Frontend - dashboard.js|
+:init();
+:Load session from localStorage;
+if (session id missing?) then (yes)
+  :Redirect to login.html;
+  stop
+else (no)
+  :Bind UI event listeners\nlogout, search, checkbox,\nmajor option, generate, save,\ndownload, chat, drag/drop;
+endif
+
+:refreshView(includePlan=false);
+fork
+  :GET /api/students/:id/progress;
+fork again
+  :GET /api/students/:id/saved-study-plans;
+end fork
+
+|Backend API - studentRoutes|
+:Parse studentId;
+
+|Service - ProgressService|
+:buildStudentAcademicContext(studentId);
+
+|Service - RuleEngineService|
+:Load student profile;
+:CatalogService.getProgramRequirements(programId, majorId);
+:Load major option selections;
+:Resolve option slots to selected courses;
+:Load student course records;
+:Load rule groups for all relevant courses;
+:Build context\npassedCourseIds, passedUnits,\nrecords, rule groups, requirements;
+
+|Service - ProgressService|
+:Calculate earned/remaining units;
+:Build program block progress;
+:Build major block progress;
+:Build elective slots;
+:Calculate level distribution;
+:Validate level rules;
+:Return progress payload;
+
+|Service - StudyPlanService|
+:getSavedStudyPlanVersions(studentId);
+:Build planning catalog;
+:List saved plan headers and items;
+:Map saved course ids to course snapshots;
+:Return saved versions sorted newest first;
+
+|Frontend - dashboard.js|
+:Store state.progress and state.savedStudyPlans;
+:syncSelectedSavedPlanId();
+:renderAll()\nstudent meta, summary,\ncourse records, requirements,\nstudy plan area, saved plans;
+
+repeat
+  |User|
+  :Choose an action in planner.html;
+
+  if (Action = mark passed/unpassed course?) then (yes)
+    |Frontend - dashboard.js|
+    :Read row course and checkbox state;
+    if (checked and record exists?) then (yes)
+      |Frontend - api.js|
+      :PUT /api/students/:id/course-records/:recordId;
+    elseif (checked and no record?) then (yes)
+      |Frontend - api.js|
+      :POST /api/students/:id/course-records;
+    else (unchecked)
+      |Frontend - api.js|
+      :DELETE /api/students/:id/course-records/:recordId;
+    endif
+
+    |Backend API - studentRoutes|
+    :Validate payload;
+    |Repository - StudentRepository|
+    :Create / update / delete course record;
+    :Touch student profile updated_at;
+    |Frontend - dashboard.js|
+    :refreshView(includePlan = lastPlanOptions exists);
+
+  elseif (Action = choose major option course?) then (yes)
+    |Frontend - api.js|
+    :PUT /api/students/:id/major-option-selections/:slotCourseId;
+    |Backend API - studentRoutes|
+    :Parse ids and validate body;
+    |Service - MajorOptionService|
+    :Load student and requirements;
+    :Find option block for slot course;
+    if (selectedCourseId is not approved?) then (yes)
+      :Throw AppError 400;
+    elseif (same selected course used by another slot?) then (yes)
+      :Throw AppError 409;
+    else (valid)
+      if (selection cleared?) then (yes)
+        |Repository - StudentRepository|
+        :Delete option selection;
+      else (selected)
+        |Repository - StudentRepository|
+        :Upsert option selection;
+      endif
+      |Service - MajorOptionService|
+      :Remove stale course record if old option\nis no longer selected/required;
+      |Repository - StudyPlanRepository|
+      :Delete saved study plans for student;
+    endif
+    |Frontend - dashboard.js|
+    :refreshView(includePlan = lastPlanOptions exists);
+
+  elseif (Action = generate study plan?) then (yes)
+    |Frontend - dashboard.js|
+    :Read startTerm, startYear,\nmaxCoursesPerTerm;
+    :refreshView(includePlan=false);
+    |Frontend - api.js|
+    :GET /api/students/:id/study-plan;
+    |Backend API - studentRoutes|
+    :Parse query with parseStudyPlanQuery();
+    |Service - StudyPlanService|
+    :Validate startTerm/startYear/load;
+    :buildPlanningCatalog(studentId);
+    :pendingCourses = remaining required courses\nand elective slots;
+    :passedCourseIds = already passed courses;
+    :termCursor = requested start term/year;
+    repeat
+      :Build unlock score map;
+      :Evaluate every pending course\nusing rule engine;
+      |Service - RuleEngineService|
+      :Check prerequisites;
+      :Check exclusions;
+      :Check course offering for term;
+      :Create assumed-knowledge warnings;
+      |Service - StudyPlanService|
+      :Filter eligible courses;
+      if (no eligible courses?) then (yes)
+        :Increment stagnantSteps;
+        if (stagnantSteps >= MAX_STAGNANT_STEPS?) then (yes)
+          :Break generation loop;
+        else (no)
+          :Move to next term;
+        endif
+      else (no)
+        :Sort eligible by\nnon-elective first, level,\nunlock score, course code;
+        :Select up to maxCoursesPerTerm;
+        :Add term with recommendedCourses\nand blockedCourses;
+        :Remove selected from pendingCourses;
+        :Simulate completion so selected courses\nunlock following terms only;
+        :Move to next term;
+      endif
+    repeat while (pendingCourses remain and generationSteps < MAX_GENERATION_TERM_STEPS?) is (yes) not (no)
+    :Return study plan with terms\nand unresolvedCourses;
+    |Frontend - dashboard.js|
+    :initializePlanEditorFromStudyPlan();
+    :Clear chat messages and validation;
+    :renderStudyPlan();
+
+  elseif (Action = drag/drop course?) then (yes)
+    |Frontend - dashboard.js|
+    :Clone current plan editor;
+    :Move course between source and target\nterm or holding area;
+    :Build validate payload;
+    |Frontend - api.js|
+    :POST /api/students/:id/saved-study-plan/validate?scope=drag;
+    |Backend API - studentRoutes|
+    :validateSaveStudyPlanPayload();
+    |Service - StudyPlanService|
+    :validateStudyPlan(scope=drag);
+    :Sort terms and check duplicate terms/courses;
+    :Reject unknown/non-plannable courses;
+    :Sequentially evaluate each term;\nsame-semester courses do not unlock each other;
+    if (validation failed?) then (yes)
+      |Frontend - dashboard.js|
+      if (moving from holding area or current plan already has issues?) then (yes)
+        :Accept edit but annotate invalid\ncourses/terms with lock markers;
+      else (no)
+        :Show Course Move Not Allowed modal;
+      endif
+    else (valid)
+      :Commit candidate editor to state;
+      :Clear validation annotations;
+      :renderStudyPlan();
+    endif
+
+  elseif (Action = save current plan?) then (yes)
+    |Frontend - dashboard.js|
+    if (holding area has unscheduled courses?) then (yes)
+      :Block save and show validation message;
+    else (no)
+      :Build payload from editor terms;
+      |Frontend - api.js|
+      :PUT /api/students/:id/saved-study-plan;
+      |Backend API - studentRoutes|
+      :validateSaveStudyPlanPayload();
+      |Service - StudyPlanService|
+      :validateStudyPlan(scope=save);
+      if (term exceeds selected study load?) then (yes)
+        :Add validation error;
+      endif
+      if (remaining required course missing?) then (yes)
+        :Add validation error;
+      endif
+      :Check prerequisites, exclusions,\nand offerings term-by-term;
+      if (errors exist?) then (yes)
+        :Throw AppError 400 with details;
+        |Frontend - dashboard.js|
+        :Annotate invalid courses/terms;
+        :Show save blocked message;
+      else (valid)
+        |Repository - StudyPlanRepository|
+        :Insert saved_study_plans header;
+        :Insert saved_study_plan_items;
+        :Delete older versions beyond 4;
+        |Service - StudyPlanService|
+        :Return saved plan snapshot;
+        |Frontend - dashboard.js|
+        :GET saved versions again;
+        :Mark editor clean;
+        :renderStudyPlan and renderSavedPlan;
+      endif
+    endif
+
+  elseif (Action = planner chat?) then (yes)
+    |Frontend - dashboard.js|
+    if (no generated plan?) then (yes)
+      :Show message to generate plan first;
+    else (no)
+      :Append user message to chat log;
+      |Frontend - api.js|
+      :POST /api/planner/chat\nstudentId, currentPlan, message;
+      |Backend API - plannerChatRoutes|
+      :Validate request body;
+      |Service - OllamaProvider|
+      :POST to Ollama /api/chat\nmodel gemma3 with JSON schema;
+      :Parse and validate planner intent;
+      |Service - PlannerChatService|
+      :applyPlannerIntent();
+      if (intent = reduce_term_load?) then (yes)
+        :Clone plan;
+        :Resolve target term and requested load;
+        :Reflow courses from target term onward;
+      elseif (intent = move_course_request?) then (yes)
+        :Clone plan;
+        :Find requested course and target term;
+        :Move course or reflow to next term;
+      elseif (intent = what_if_adjustment?) then (yes)
+        :Clone plan for preview only;
+        :Derive inner adjustment and apply it;
+        :Mark response isWhatIf=true;
+      else (unsupported)
+        :Return no-op response with warning;
+      endif
+      :Validate candidate plan\nusing StudyPlanService.validateStudyPlan(scope=drag)\nor fallback checks;
+      :Return summary, updatedPlan,\nchanges, warnings, parsedIntent;
+      |Frontend - dashboard.js|
+      if (updatedPlan and not what-if?) then (yes)
+        :Normalize returned plan;
+        :Update editor and mark dirty;
+        :renderStudyPlan();
+      else (what-if/no update)
+        :Keep current editor unchanged;
+      endif
+      :Append assistant/preview/error message;
+      :renderPlannerChat();
+    endif
+
+  elseif (Action = saved plan version?) then (yes)
+    |Frontend - dashboard.js|
+    if (download selected version?) then (yes)
+      :Build printable HTML;
+      :Open print window and call print();
+    elseif (delete selected version?) then (yes)
+      |Frontend - api.js|
+      :DELETE /api/students/:id/saved-study-plan/:planId;
+      |Backend API - studentRoutes|
+      :Parse ids;
+      |Service - StudyPlanService|
+      :Confirm student and plan exist;
+      |Repository - StudyPlanRepository|
+      :Delete saved plan version;
+      |Frontend - dashboard.js|
+      :Refresh saved plan list and render;
+    else (select version)
+      :Update selectedSavedPlanId;
+      :renderSavedPlan();
+    endif
+
+  else (logout)
+    |Frontend - dashboard.js|
+    :Remove localStorage session;
+    :Redirect to login.html;
+    stop
+  endif
+
+repeat while (user continues using dashboard?) is (yes) not (no)
+
+stop
+@enduml
